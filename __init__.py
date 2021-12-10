@@ -32,7 +32,7 @@ bl_info = {
     "version": (0, 0, 1),
     "blender": (2, 80, 0),
     "description": "Generate templates for Tiles, walls etc for your 3D printed dungeon with ",
-    "doc_url": "",
+    "doc_url": "https://github.com/PieterVdc/Openlock-Template-maker/wiki",
     "warning": "WIP",
     "category": "Add Mesh"
     }
