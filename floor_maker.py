@@ -73,16 +73,9 @@ def create_object(self, context):
     for o in bpy.data.objects:
         o.select_set(False)
 
-    # we create main object and mesh
-    mainmesh = bpy.data.meshes.new("Floor")
-    mainobject = bpy.data.objects.new("Floor", mainmesh)
-    mainobject.location = bpy.context.scene.cursor.location
-    bpy.context.collection.objects.link(mainobject)
-    mainobject.FloorObjectGenerator.add()
 
-    # we shape the main object and create other objects as children
-    shape_mesh(mainobject, mainmesh)
-    shape_children(mainobject)
+    mainobject = create_Floor_data()
+
 
     # we select, and activate, main object
     mainobject.select_set(True)
@@ -102,36 +95,12 @@ def update_object(self, context):
     oldname = o.data.name
     # Now we deselect that object to not delete it.
     o.select_set(False)
-    # and we create a new mesh
-    tmp_mesh = bpy.data.meshes.new("temp")
     # deselect all objects
     for obj in bpy.data.objects:
         obj.select_set(False)
 
-    # ---------------------------------
-    #  Clear Parent objects (autohole)
-    # ---------------------------------
-    myparent = o.parent
-    if myparent is not None:
-        ploc = myparent.location
-        o.parent = None
-        o.location = ploc
-        # remove_children(parent)
-        for child in myparent.children:
-            # noinspection PyBroadException
-            try:
-                # clear child data
-                child.hide_viewport = False  # must be visible to avoid bug
-                child.hide_render = False  # must be visible to avoid bug
-                old = child.data
-                child.select_set(True)
-                bpy.ops.object.delete()
-                bpy.data.meshes.remove(old)
-            except:
-                dummy = -1
 
-        myparent.select_set(True)
-        bpy.ops.object.delete()
+
 
     # -----------------------
     # remove all children
@@ -139,68 +108,15 @@ def update_object(self, context):
     # first granchild
     for child in o.children:
         remove_children(child)
+        print("child:" + child.name)
     # now children of main object
     remove_children(o)
 
-    # Finally we create all that again (except main object),
-    shape_mesh(o, tmp_mesh, True)
-    o.data = tmp_mesh
-    shape_children(o, True)
-    # Remove data (mesh of active object),
-    bpy.data.meshes.remove(oldmesh)
-    tmp_mesh.name = oldname
-    # and select, and activate, the main object
-    o.select_set(True)
-    bpy.context.view_layer.objects.active = o
-
-
-# ------------------------------------------------------------------------------
-# Generate all objects
-# For main, it only shapes mesh and creates modifiers (the modifier, only the first time).
-# And, for the others, it creates object and mesh.
-# ------------------------------------------------------------------------------
-# noinspection PyUnusedLocal
-def shape_mesh(mainobject, tmp_mesh, update=False):
-    mp = mainobject.FloorObjectGenerator[0]
-    # Create only mesh, because the object is created before
-
-    remove_doubles(mainobject)
-    set_normals(mainobject)
-
-
-    return
-
-# ------------------------------------------------------------------------------
-# Generate all Children
-#
-# ------------------------------------------------------------------------------
-# noinspection PyUnusedLocal
-
-
-def shape_children(mainobject, update=False):
-    mp = mainobject.FloorObjectGenerator[0]
-
-    make_one_Floor(mp, mainobject)
-
-
-    # -------------------------
-    # Create empty and parent
-    # -------------------------
-    bpy.ops.object.empty_add(type='PLAIN_AXES')
-    myempty = bpy.data.objects[bpy.context.active_object.name]
-    myempty.location = mainobject.location
-
-    myempty.name = "Floor_Group"
-    parentobject(myempty, mainobject)
-    mainobject["dungeontiles.hole_enable"] = True
-
-
-
-
-    # deactivate others
-    for o in bpy.data.objects:
-        if o.select_get() is True and o.name != mainobject.name:
-            o.select_set(False)
+    mp = o.FloorObjectGenerator[0]
+    mainobject = update_Floor_data(o,mp)
+    # we select, and activate, main object
+    mainobject.select_set(True)
+    bpy.context.view_layer.objects.active = mainobject
 
 
 # ------------------------------------------------------------------
@@ -212,14 +128,14 @@ class ObjectProperties(PropertyGroup):
             name='Frame width',
             min=0.5, max=50,
             default=2, precision=1,
-			step=50,
+            step=50,
             description='Doorframe width', update=update_object,
             )
     Y: FloatProperty(
             name='Frame height',
             min=0.5, max=50,
-            default=2, precision=1,
-			step=50,
+             default=2, precision=1,
+            step=50,
             description='Doorframe height', update=update_object,
             )
     handle: EnumProperty(
@@ -297,30 +213,89 @@ class dungeontiles_PT_FloorObjectgenerator(Panel):
 
 
 # ------------------------------------------------------------------------------
-# Make one Floor
-#
-# ------------------------------------------------------------------------------
-def make_one_Floor(self, myframe):
-    myFloor = create_Floor_data(self, myframe)
-
-    set_normals(myFloor)
-
-    return myFloor
-
-
-# ------------------------------------------------------------------------------
 # Create Floor
 # All custom values are passed using self container (self.myvariable)
 # ------------------------------------------------------------------------------
-def create_Floor_data(self, myframe):
+def create_Floor_data():
 
-    mydata = Floor_model_01(self.X, self.Y)
+    tempMesh = bpy.data.meshes.new("TempMesh")
+    myobject = bpy.data.objects.new("FloorObject", tempMesh)
+    myobject.FloorObjectGenerator.add()
+    mp = myobject.FloorObjectGenerator[0]
+    
+    myobject.location = bpy.context.scene.cursor.location
+    bpy.context.collection.objects.link(myobject)
+    
+    myobject = update_Floor_data(myobject,mp)
+    
+    return myobject
+    
+    # ------------------------------------------------------------------------------
+# Create Floor
+# All custom values are passed using self container (self.myvariable)
+# ------------------------------------------------------------------------------
+def update_Floor_data(myobject,mp):
+
+    mydata = Floor_model_01(mp.X, mp.Y)
+    
+    verts = mydata[0]
+    faces = mydata[1]
+    
+    old_mesh = myobject.data
+    old_mesh.name = "old_mesh"
+    
+    mymesh = bpy.data.meshes.new("FloorMesh")
+    
+    
+    mymesh.from_pydata(verts, [], faces)
+    mymesh.update(calc_edges=True)
+    myobject.data = mymesh
+    
+    # Translate to Floorframe and parent
+    myobject.lock_rotation = (True, True, False)
+    myobject.lock_location = (True, True, True)
+    
+    set_normals(myobject)
+    
+    removeMeshFromMemory(old_mesh.name)
+    
+    return myobject
+
+
+def removeMeshFromMemory (passedMeshName):
+    # Extra test because this can crash Blender.
+    mesh = bpy.data.meshes[passedMeshName]
+    print(passedMeshName)
+    try:
+        mesh.user_clear()
+        can_continue = True
+    except:
+        can_continue = False
+    
+    if can_continue == True:
+        try:
+            bpy.data.meshes.remove(mesh)
+            result = True
+        except:
+            result = False
+    else:
+        result = False
+        
+    return result
+            
+# ------------------------------------------------------------------------------
+# Create OpenlockBool
+# All custom values are passed using self container (self.myvariable)
+# ------------------------------------------------------------------------------
+def create_OpenLockBool_data(self, myframe):
+
+    mydata = OpenLock_Clip_Bool_Floor_model(self.X, self.Y)
     
     verts = mydata[0]
     faces = mydata[1]
 
-    mymesh = bpy.data.meshes.new("Floor")
-    myobject = bpy.data.objects.new("Floor", mymesh)
+    mymesh = bpy.data.meshes.new("ClipBool")
+    myobject = bpy.data.objects.new("ClipBool", mymesh)
 
     myobject.location = bpy.context.scene.cursor.location
     bpy.context.collection.objects.link(myobject)
@@ -334,7 +309,6 @@ def create_Floor_data(self, myframe):
     myobject.lock_location = (True, True, True)
 
     return myobject
-
 
 # ----------------------------------------------
 # Floor Box
@@ -360,11 +334,11 @@ def Floor_model_01(X, Y):
                (7, 6, 5, 4)]
 
     return myvertex, myfaces
-	
+    
 # ----------------------------------------------
 # OpenLock Clip Bool Floor
 # ----------------------------------------------
-def OpenLock_Clip_Bool_Floor_model(X, Y):
+def OpenLock_Clip_Bool_Floor_model():
 
     BOOL_BOTTOM_HEIGHT = 1.4
     BOOL_TOP_HEIGHT = 5.6
@@ -380,7 +354,7 @@ def OpenLock_Clip_Bool_Floor_model(X, Y):
                 (11,  2, BOOL_BOTTOM_HEIGHT),
                 (10,  2, BOOL_BOTTOM_HEIGHT),
                 (10,  0, BOOL_BOTTOM_HEIGHT),
-				(0,   0, BOOL_TOP_HEIGHT),
+                (0,   0, BOOL_TOP_HEIGHT),
                 (0,   2, BOOL_TOP_HEIGHT),
                 (1,   2, BOOL_TOP_HEIGHT),
                 (2,   5, BOOL_TOP_HEIGHT),
@@ -393,6 +367,6 @@ def OpenLock_Clip_Bool_Floor_model(X, Y):
 
     # Faces
     myfaces = [(0, 1, 10, 11), (1, 2, 11, 12), (2, 3, 12, 13), (3, 4, 13, 14), (4, 5, 14, 15),
-	           (5, 6, 15, 16), (6, 7, 16, 17), (7, 8, 17, 18), (8, 9, 18, 19),(0, 1, 18, 19),(0,1,2,3,4,5,6,7,8,9),(10,11,12,13,14,15,16,17,18,19)]
+               (5, 6, 15, 16), (6, 7, 16, 17), (7, 8, 17, 18), (8, 9, 18, 19),(0, 1, 18, 19),(0,1,2,3,4,5,6,7,8,9),(10,11,12,13,14,15,16,17,18,19)]
 
     return myvertex, myfaces
