@@ -73,9 +73,7 @@ def create_object(self, context):
     for o in bpy.data.objects:
         o.select_set(False)
 
-
     mainobject = create_Floor_data()
-
 
     # we select, and activate, main object
     mainobject.select_set(True)
@@ -98,9 +96,6 @@ def update_object(self, context):
     # deselect all objects
     for obj in bpy.data.objects:
         obj.select_set(False)
-
-
-
 
     # -----------------------
     # remove all children
@@ -246,18 +241,19 @@ def update_Floor_data(myobject,mp):
     
     mymesh = bpy.data.meshes.new("FloorMesh")
     
-    
     mymesh.from_pydata(verts, [], faces)
     mymesh.update(calc_edges=True)
     myobject.data = mymesh
     
     # Translate to Floorframe and parent
     myobject.lock_rotation = (True, True, False)
-    myobject.lock_location = (True, True, True)
+    myobject.lock_location = (False, False, True)
     
     set_normals(myobject)
     
     removeMeshFromMemory(old_mesh.name)
+    myobject.modifiers.clear()
+    createBoolObjects(myobject,mp)
     
     return myobject
 
@@ -265,7 +261,6 @@ def update_Floor_data(myobject,mp):
 def removeMeshFromMemory (passedMeshName):
     # Extra test because this can crash Blender.
     mesh = bpy.data.meshes[passedMeshName]
-    print(passedMeshName)
     try:
         mesh.user_clear()
         can_continue = True
@@ -282,33 +277,56 @@ def removeMeshFromMemory (passedMeshName):
         result = False
         
     return result
-            
+    
 # ------------------------------------------------------------------------------
 # Create OpenlockBool
 # All custom values are passed using self container (self.myvariable)
 # ------------------------------------------------------------------------------
-def create_OpenLockBool_data(self, myframe):
+def createBoolObjects(floorObject,mp):
+    
+    XnumBoolObjects = int(mp.X * 2) - 1
+    YnumBoolObjects = int(mp.Y * 2) - 1
 
-    mydata = OpenLock_Clip_Bool_Floor_model(self.X, self.Y)
+    
+    for X in range(XnumBoolObjects):
+        create_OpenLockBool_data(floorObject,X*12.7+5.7                ,0         ,0)   
+        print(X)
+    for Y in range(YnumBoolObjects):
+        create_OpenLockBool_data(floorObject,mp.X*25.4                 ,Y*12.7+5.7,0.5 * math.pi)
+        print(Y)
+    for X in range(XnumBoolObjects):
+        create_OpenLockBool_data(floorObject,mp.X*25.4 - (X*12.7) - 5.7,mp.Y*25.4       ,math.pi)  
+        print(X)
+    for Y in range(YnumBoolObjects):
+        create_OpenLockBool_data(floorObject,0                         ,mp.Y*25.4 - (Y * 12.7)-5.7,1.5 * math.pi)
+        print(Y)
+    
+# ------------------------------------------------------------------------------
+# Create OpenlockBool
+# All custom values are passed using self container (self.myvariable)
+# ------------------------------------------------------------------------------
+def create_OpenLockBool_data(floorObject,X,Y,rotation):
+    
+    mydata = OpenLock_Clip_Bool_Floor_model()
     
     verts = mydata[0]
     faces = mydata[1]
 
-    mymesh = bpy.data.meshes.new("ClipBool")
-    myobject = bpy.data.objects.new("ClipBool", mymesh)
+    boolMesh = bpy.data.meshes.new("ClipBool")
+    boolObject = bpy.data.objects.new("ClipBool", boolMesh)
+    boolObject.location = (X,Y,0)
+    boolObject.rotation_mode = 'XYZ'
+    boolObject.rotation_euler = (0,0,rotation)
+    bpy.context.collection.objects.link(boolObject)
+    boolMesh.from_pydata(verts, [], faces)
+    boolMesh.update(calc_edges=True)
 
-    myobject.location = bpy.context.scene.cursor.location
-    bpy.context.collection.objects.link(myobject)
-
-    mymesh.from_pydata(verts, [], faces)
-    mymesh.update(calc_edges=True)
-
-    # Translate to Floorframe and parent
-    myobject.parent = myframe
-    myobject.lock_rotation = (True, True, False)
-    myobject.lock_location = (True, True, True)
-
-    return myobject
+    boolObject.parent = floorObject
+    boolObject.lock_rotation = (True, True, True)
+    boolObject.lock_location = (True, True, True)
+    set_modifier_boolean(floorObject,boolObject)
+    boolObject.display_type = 'WIRE'
+    return boolObject
 
 # ----------------------------------------------
 # Floor Box
@@ -342,31 +360,135 @@ def OpenLock_Clip_Bool_Floor_model():
 
     BOOL_BOTTOM_HEIGHT = 1.4
     BOOL_TOP_HEIGHT = 5.6
+    
+    SUPPORT_LAYER1_HEIGHT = 1.9
+    SUPPORT_LAYER2_HEIGHT = 3
+    SUPPORT_LAYER3_HEIGHT = 3.5
+    SUPPORT_LAYER4_HEIGHT = 4
+    SUPPORT_LAYER5_HEIGHT = 5.1
+    SUPPORT_DEPTH         = 2
+    SUPPORT_X_1_1 = 3.9
+    SUPPORT_X_1_2 = 4.1
+    SUPPORT_X_1_3 = 5.1
+    SUPPORT_X_1_4 = 5.3
+    SUPPORT_X_2_1 = 8.9
+    SUPPORT_X_2_2 = 9.1
+    SUPPORT_X_2_3 = 10.1
+    SUPPORT_X_2_4 = 10.3
+
+
+
+
 
     # Vertex
-    myvertex = [(0,   0, BOOL_BOTTOM_HEIGHT),
+    myvertex = [(0,   -.1, BOOL_BOTTOM_HEIGHT),
                 (0,   2, BOOL_BOTTOM_HEIGHT),
                 (1,   2, BOOL_BOTTOM_HEIGHT),
                 (2,   5, BOOL_BOTTOM_HEIGHT),
                 (2,   6, BOOL_BOTTOM_HEIGHT),
                 (12,  6, BOOL_BOTTOM_HEIGHT),
                 (12,  5, BOOL_BOTTOM_HEIGHT),
-                (11,  2, BOOL_BOTTOM_HEIGHT),
-                (10,  2, BOOL_BOTTOM_HEIGHT),
-                (10,  0, BOOL_BOTTOM_HEIGHT),
-                (0,   0, BOOL_TOP_HEIGHT),
+                (13,  2, BOOL_BOTTOM_HEIGHT),
+                (14,  2, BOOL_BOTTOM_HEIGHT),
+                (14,  -.1, BOOL_BOTTOM_HEIGHT),#10
+                (0,   -.1, BOOL_TOP_HEIGHT),
                 (0,   2, BOOL_TOP_HEIGHT),
                 (1,   2, BOOL_TOP_HEIGHT),
                 (2,   5, BOOL_TOP_HEIGHT),
                 (2,   6, BOOL_TOP_HEIGHT),
                 (12,  6, BOOL_TOP_HEIGHT),
                 (12,  5, BOOL_TOP_HEIGHT),
-                (11,  2, BOOL_TOP_HEIGHT),
-                (10,  2, BOOL_TOP_HEIGHT),
-                (10,  0, BOOL_TOP_HEIGHT)]
+                (13,  2, BOOL_TOP_HEIGHT),    
+                (14,  2, BOOL_TOP_HEIGHT),
+                (14,  -.1, BOOL_TOP_HEIGHT),
+                
+                (SUPPORT_X_1_2,-.1,BOOL_BOTTOM_HEIGHT),#20
+                (SUPPORT_X_1_1,-.1,SUPPORT_LAYER1_HEIGHT),
+                (SUPPORT_X_1_1,-.1,SUPPORT_LAYER2_HEIGHT),
+                (SUPPORT_X_1_2,-.1,SUPPORT_LAYER3_HEIGHT),
+                (SUPPORT_X_1_1,-.1,SUPPORT_LAYER4_HEIGHT),
+                (SUPPORT_X_1_1,-.1,SUPPORT_LAYER5_HEIGHT),
+                (SUPPORT_X_1_2,-.1,BOOL_TOP_HEIGHT),
+                (SUPPORT_X_1_3,-.1,BOOL_BOTTOM_HEIGHT),#27
+                (SUPPORT_X_1_4,-.1,SUPPORT_LAYER1_HEIGHT),
+                (SUPPORT_X_1_4,-.1,SUPPORT_LAYER2_HEIGHT),
+                (SUPPORT_X_1_3,-.1,SUPPORT_LAYER3_HEIGHT),
+                (SUPPORT_X_1_4,-.1,SUPPORT_LAYER4_HEIGHT),
+                (SUPPORT_X_1_4,-.1,SUPPORT_LAYER5_HEIGHT),
+                (SUPPORT_X_1_3,-.1,BOOL_TOP_HEIGHT),
+                (SUPPORT_X_1_2,SUPPORT_DEPTH,BOOL_BOTTOM_HEIGHT),#34
+                (SUPPORT_X_1_1,SUPPORT_DEPTH,SUPPORT_LAYER1_HEIGHT),
+                (SUPPORT_X_1_1,SUPPORT_DEPTH,SUPPORT_LAYER2_HEIGHT),
+                (SUPPORT_X_1_2,SUPPORT_DEPTH,SUPPORT_LAYER3_HEIGHT),
+                (SUPPORT_X_1_1,SUPPORT_DEPTH,SUPPORT_LAYER4_HEIGHT),
+                (SUPPORT_X_1_1,SUPPORT_DEPTH,SUPPORT_LAYER5_HEIGHT),
+                (SUPPORT_X_1_2,SUPPORT_DEPTH,BOOL_TOP_HEIGHT),
+                (SUPPORT_X_1_3,SUPPORT_DEPTH,BOOL_BOTTOM_HEIGHT),#41
+                (SUPPORT_X_1_4,SUPPORT_DEPTH,SUPPORT_LAYER1_HEIGHT),
+                (SUPPORT_X_1_4,SUPPORT_DEPTH,SUPPORT_LAYER2_HEIGHT),
+                (SUPPORT_X_1_3,SUPPORT_DEPTH,SUPPORT_LAYER3_HEIGHT),
+                (SUPPORT_X_1_4,SUPPORT_DEPTH,SUPPORT_LAYER4_HEIGHT),
+                (SUPPORT_X_1_4,SUPPORT_DEPTH,SUPPORT_LAYER5_HEIGHT),
+                (SUPPORT_X_1_3,SUPPORT_DEPTH,BOOL_TOP_HEIGHT),
+                
+                (SUPPORT_X_2_2,-.1,BOOL_BOTTOM_HEIGHT),#48
+                (SUPPORT_X_2_1,-.1,SUPPORT_LAYER1_HEIGHT),
+                (SUPPORT_X_2_1,-.1,SUPPORT_LAYER2_HEIGHT),
+                (SUPPORT_X_2_2,-.1,SUPPORT_LAYER3_HEIGHT),
+                (SUPPORT_X_2_1,-.1,SUPPORT_LAYER4_HEIGHT),
+                (SUPPORT_X_2_1,-.1,SUPPORT_LAYER5_HEIGHT),
+                (SUPPORT_X_2_2,-.1,BOOL_TOP_HEIGHT),
+                (SUPPORT_X_2_3,-.1,BOOL_BOTTOM_HEIGHT),#55
+                (SUPPORT_X_2_4,-.1,SUPPORT_LAYER1_HEIGHT),
+                (SUPPORT_X_2_4,-.1,SUPPORT_LAYER2_HEIGHT),
+                (SUPPORT_X_2_3,-.1,SUPPORT_LAYER3_HEIGHT),
+                (SUPPORT_X_2_4,-.1,SUPPORT_LAYER4_HEIGHT),
+                (SUPPORT_X_2_4,-.1,SUPPORT_LAYER5_HEIGHT),
+                (SUPPORT_X_2_3,-.1,BOOL_TOP_HEIGHT),
+                (SUPPORT_X_2_2,SUPPORT_DEPTH,BOOL_BOTTOM_HEIGHT),#62
+                (SUPPORT_X_2_1,SUPPORT_DEPTH,SUPPORT_LAYER1_HEIGHT),
+                (SUPPORT_X_2_1,SUPPORT_DEPTH,SUPPORT_LAYER2_HEIGHT),
+                (SUPPORT_X_2_2,SUPPORT_DEPTH,SUPPORT_LAYER3_HEIGHT),
+                (SUPPORT_X_2_1,SUPPORT_DEPTH,SUPPORT_LAYER4_HEIGHT),
+                (SUPPORT_X_2_1,SUPPORT_DEPTH,SUPPORT_LAYER5_HEIGHT),
+                (SUPPORT_X_2_2,SUPPORT_DEPTH,BOOL_TOP_HEIGHT),
+                (SUPPORT_X_2_3,SUPPORT_DEPTH,BOOL_BOTTOM_HEIGHT),#69
+                (SUPPORT_X_2_4,SUPPORT_DEPTH,SUPPORT_LAYER1_HEIGHT),
+                (SUPPORT_X_2_4,SUPPORT_DEPTH,SUPPORT_LAYER2_HEIGHT),
+                (SUPPORT_X_2_3,SUPPORT_DEPTH,SUPPORT_LAYER3_HEIGHT),
+                (SUPPORT_X_2_4,SUPPORT_DEPTH,SUPPORT_LAYER4_HEIGHT),
+                (SUPPORT_X_2_4,SUPPORT_DEPTH,SUPPORT_LAYER5_HEIGHT),
+                (SUPPORT_X_2_3,SUPPORT_DEPTH,BOOL_TOP_HEIGHT)
+                
+                
+                ]
 
     # Faces
-    myfaces = [(0, 1, 10, 11), (1, 2, 11, 12), (2, 3, 12, 13), (3, 4, 13, 14), (4, 5, 14, 15),
-               (5, 6, 15, 16), (6, 7, 16, 17), (7, 8, 17, 18), (8, 9, 18, 19),(0, 1, 18, 19),(0,1,2,3,4,5,6,7,8,9),(10,11,12,13,14,15,16,17,18,19)]
+    myfaces = [(10,11,1,0), (11,12,2,1), (12,13,3,2), (13,14,4,3), (14,15,5,4),
+               (15,16,6,5), (16,17,7,6), (17,18,8,7), (18,19,9,8),
+               (2,3,4,5,6,7,69,62,41,34),
+               (40,47,68,75,17,16,15,14,13,12),
+               
+               (0,1,2,34,20),(27,41,62,48),(7,8,9,55,69),
+               (26,40,12,11,10),(54,68,47,33),(75,61,19,18,17),
+               
+               (10,0,20,21,22,23,24,25,26),
+               (41,42,43,44,45,46,47,40,39,38,37,36,35,34),
+               (69,70,71,72,73,74,75,68,67,66,65,64,63,62),
+               (48,49,50,51,52,53,54,33,32,31,30,29,28,27),
+               (9,19,61,60,59,58,57,56,55),
+                              
+               (34,35,21,20),(35,36,22,21),(36,37,23,22),(37,38,24,23),(38,39,25,24),(39,40,26,25),
+               (27,28,42,41),(28,29,43,42),(29,30,44,43),(30,31,45,44),(31,32,46,45),(32,33,47,46),
+               (62,63,49,48),(63,64,50,49),(64,65,51,50),(65,66,52,51),(66,67,53,52),(67,68,54,53),
+               (55,56,70,69),(56,57,71,70),(57,58,72,71),(58,59,73,72),(59,60,74,73),(60,61,75,74)
+               
+               
+               
+               
+               
+               
+               
+               ]
 
     return myvertex, myfaces
